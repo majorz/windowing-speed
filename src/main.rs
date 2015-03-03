@@ -1,5 +1,14 @@
+#![feature(libc)]
+
+extern crate libc;
+
 mod ffi;
 
+
 fn main() {
-    ffi::xcb::hello_ffi();
+    let connection = ffi::xcb::Connection::new();
+
+    println!("Connected!");
+    
+    connection.disconnect();
 }
