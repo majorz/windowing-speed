@@ -8,7 +8,9 @@ mod ffi;
 fn main() {
     let connection = ffi::xcb::Connection::new();
 
-    println!("Connected!");
+    let screen = connection.screen();
+
+    screen.print_dimensions();
 
     connection.disconnect();
 }
