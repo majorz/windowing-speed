@@ -6,11 +6,9 @@ mod ffi;
 
 
 fn main() {
-    let connection = ffi::xcb::Connection::new();
+    let xcb = ffi::xcb::XCB::new();
 
-    let screen = connection.screen();
+    xcb.print_dimensions();
 
-    screen.print_dimensions();
-
-    connection.disconnect();
+    xcb.disconnect();
 }
