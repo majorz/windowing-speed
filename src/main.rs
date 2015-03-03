@@ -9,6 +9,6 @@ fn main() {
     let connection = ffi::xcb::Connection::new();
 
     println!("Connected!");
-    
+
     connection.disconnect();
 }

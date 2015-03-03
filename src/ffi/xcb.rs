@@ -69,11 +69,11 @@ struct XCBScreenIteratorFFI {
 
 #[link(name = "xcb")]
 extern {
-	fn xcb_connect(displayname: *const c_char, screenp:*mut c_int) -> *mut XCBConnectionFFI;
-	fn xcb_connection_has_error(c: *mut XCBConnectionFFI) -> c_int;
-	fn xcb_disconnect(c: *mut XCBConnectionFFI);
+    fn xcb_connect(displayname: *const c_char, screenp:*mut c_int) -> *mut XCBConnectionFFI;
+    fn xcb_connection_has_error(c: *mut XCBConnectionFFI) -> c_int;
+    fn xcb_disconnect(c: *mut XCBConnectionFFI);
 
-	fn xcb_setup_roots_iterator(R: *mut XCBSetupFFI) -> XCBScreenIteratorFFI;
+    fn xcb_setup_roots_iterator(R: *mut XCBSetupFFI) -> XCBScreenIteratorFFI;
 }
 
 
@@ -85,24 +85,24 @@ pub struct Connection {
 
 
 impl Connection {
-	#[inline]
-	pub fn new() -> Self {
-		let mut screen: c_int = 0;
-		unsafe {
-			let c = xcb_connect(ptr::null(), &mut screen);
-			if xcb_connection_has_error(c) > 0 {
-				panic!("A XCB connection was not established due to a fatal error.")
-			}
+    #[inline]
+    pub fn new() -> Self {
+        let mut screen: c_int = 0;
+        unsafe {
+            let c = xcb_connect(ptr::null(), &mut screen);
+            if xcb_connection_has_error(c) > 0 {
+                panic!("A XCB connection was not established due to a fatal error.")
+            }
 
-			Connection{
-				c: c,
-			}
+            Connection{
+                c: c,
+            }
         }
-	}
+    }
 
-	pub fn disconnect(&self) {
-		unsafe {
-			xcb_disconnect(self.c);
+    pub fn disconnect(&self) {
+        unsafe {
+            xcb_disconnect(self.c);
         }
-	}
+    }
 }
