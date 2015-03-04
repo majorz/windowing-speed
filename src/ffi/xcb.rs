@@ -1,11 +1,16 @@
 #![allow(dead_code)]
 
 use libc::{c_int, c_char, c_uchar, c_ushort, c_uint};
+use libc::funcs::posix88::unistd::pause;
 use std::ptr;
 use std::mem;
 use std::default::Default;
 
 // CONSTANTS
+
+const XCB_WINDOW_CLASS_COPY_FROM_PARENT: c_ushort = 0;
+const XCB_WINDOW_CLASS_INPUT_OUTPUT: c_ushort = 1;
+const XCB_WINDOW_CLASS_INPUT_ONLY: c_ushort = 2;
 
 const XCB_GC_FUNCTION: c_uint = 1;
 const XCB_GC_PLANE_MASK: c_uint = 2;
@@ -130,8 +135,33 @@ extern {
 
     fn xcb_generate_id(c: *mut XCBConnectionFFI) -> c_uint;
 
-    fn xcb_create_gc(c: *mut XCBConnectionFFI, cid: XCBGcontextFFI, drawable: XCBDrawableFFI,
-        value_mask: c_uint, value_list: *const c_uint) -> XCBVoidCookieFFI;
+    fn xcb_create_gc(
+        c: *mut XCBConnectionFFI,
+        cid: XCBGcontextFFI,
+        drawable: XCBDrawableFFI,
+        value_mask: c_uint,
+        value_list: *const c_uint
+    ) -> XCBVoidCookieFFI;
+
+    fn xcb_create_window(
+        c: *mut XCBConnectionFFI,
+        depth: c_uchar,
+        wid: XCBWindowFFI,
+        parent: XCBWindowFFI,
+        x: c_ushort,
+        y: c_ushort,
+        width: c_ushort,
+        height: c_ushort,
+        border_width: c_ushort,
+        _class: c_ushort,
+        visual: XCBVisualidFFI,
+        value_mask: c_uint,
+        value_list: *const c_uint
+    ) -> XCBVoidCookieFFI;
+
+    fn xcb_map_window(c: *mut XCBConnectionFFI, window: XCBWindowFFI) -> XCBVoidCookieFFI;
+
+    fn xcb_flush(c: *mut XCBConnectionFFI) -> c_int;
 }
 
 
@@ -140,27 +170,27 @@ extern {
 pub struct XCB {
     connection: *mut XCBConnectionFFI,
 
-    screen: *mut XCBScreenFFI,
+    screen: Option<*mut XCBScreenFFI>,
 
-    //w: *mut XCBWindowFFI,
+    window: Option<XCBWindowFFI>,
 }
 
 
 impl XCB {
     #[inline]
     pub fn new() -> Self {
-        let mut screen: c_int = 0;
         unsafe {
+            let mut screen: c_int = 0;
             let connection = xcb_connect(ptr::null(), &mut screen);
-            if xcb_connection_has_error(connection) > 0 {
-                panic!("A XCB connection was not established due to a fatal error.")
-            }
 
-            let screen = screen_from_connection(connection);
+            if xcb_connection_has_error(connection) > 0 {
+                panic!("Fatal error during establishing a XCB connection.")
+            }
 
             XCB {
                 connection: connection,
-                screen: screen,
+                screen: None,
+                window: None,
             }
         }
     }
@@ -172,26 +202,67 @@ impl XCB {
         }
     }
 
-    pub fn print_dimensions(&self) {
+    pub fn create_window(&mut self) {
+        self.init_screen();
+
         unsafe {
-            println!(
-                "w: {}, h: {}",
-                (*self.screen).width_in_pixels,
-                (*self.screen).height_in_pixels
+            let window = xcb_generate_id(self.connection);
+            self.window = Some(window);
+
+            let screen = *self.screen.unwrap();
+
+            xcb_create_window(
+                self.connection,
+                0, // Depth - copy from parent
+                window,
+                screen.root,
+                200, 200,
+                400, 300,
+                10,
+                XCB_WINDOW_CLASS_INPUT_OUTPUT,
+                screen.root_visual,
+                0, ptr::null(),
             );
+
+            xcb_map_window(self.connection, window);
+        }
+    }
+
+    pub fn pause(&self) {
+        unsafe {
+            xcb_flush(self.connection);
+
+            pause();
+        }
+    }
+
+    fn init_screen(&mut self) {
+        match self.screen {
+            None => unsafe {
+                let iterator = xcb_setup_roots_iterator(
+                    xcb_get_setup(self.connection)
+                );
+
+                self.screen = Some(iterator.data);
+            },
+            Some(_) => ()
+        }
+    }
+
+    pub fn print_screen_dimensions(&self) {
+        match self.screen {
+            Some(screenp) => unsafe {
+                let screen = *screenp;
+                println!(
+                    "Screen w: {}, h: {}",
+                    screen.width_in_pixels,
+                    screen.height_in_pixels
+                );
+            },
+            None => ()
         }
     }
 }
 
 
-#[inline]
-fn screen_from_connection(connection: *mut XCBConnectionFFI) -> *mut XCBScreenFFI {
-    unsafe {
-        let iterator = xcb_setup_roots_iterator(
-            xcb_get_setup(connection)
-        );
-
-        iterator.data
-    }
-}
 

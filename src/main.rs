@@ -6,9 +6,13 @@ mod ffi;
 
 
 fn main() {
-    let xcb = ffi::xcb::XCB::new();
+    let mut xcb = ffi::xcb::XCB::new();
 
-    xcb.print_dimensions();
+    xcb.create_window();
+
+    xcb.print_screen_dimensions();
+
+    xcb.pause();
 
     xcb.disconnect();
 }
