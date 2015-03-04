@@ -160,19 +160,31 @@ impl Default for XCBVoidCookieFFI {
     fn default() -> XCBVoidCookieFFI { unsafe { mem::zeroed() } }
 }
 
-
 #[repr(C)]
 #[derive(Copy)]
-pub struct XCBGenericEventFFI {
-    pub response_type: c_uchar,
-    pub pad0: c_uchar,
-    pub sequence: c_ushort,
-    pub pad: [c_uint; 7usize],
-    pub full_sequence: c_uint,
+struct XCBGenericEventFFI {
+    response_type: c_uchar,
+    pad0: c_uchar,
+    sequence: c_ushort,
+    pad: [c_uint; 7usize],
+    full_sequence: c_uint,
 }
 
 impl Default for XCBGenericEventFFI {
     fn default() -> XCBGenericEventFFI { unsafe { mem::zeroed() } }
+}
+
+#[repr(C)]
+#[derive(Copy)]
+pub struct XCBRectangleFFI {
+    pub x: c_ushort,
+    pub y: c_ushort,
+    pub width: c_ushort,
+    pub height: c_ushort,
+}
+
+impl Default for XCBRectangleFFI {
+    fn default() -> XCBRectangleFFI { unsafe { mem::zeroed() } }
 }
 
 
@@ -221,6 +233,15 @@ extern {
     fn xcb_flush(c: *mut XCBConnectionFFI) -> c_int;
 
     fn xcb_wait_for_event(c: *mut XCBConnectionFFI) -> *mut XCBGenericEventFFI;
+
+    fn xcb_poly_rectangle(
+        c: *mut XCBConnectionFFI,
+        drawable: XCBDrawableFFI,
+        gc: XCBGcontextFFI,
+        rectangles_len: c_uint,
+        rectangles: *const XCBRectangleFFI
+    ) -> XCBVoidCookieFFI;
+
 }
 
 
@@ -297,11 +318,35 @@ impl XCB {
 
     pub fn exec(&self) {
         unsafe {
+            let screen = *self.screen.unwrap();
+            let windowp = self.window.unwrap();
+
+            let foreground = xcb_generate_id(self.connection);
+            let mask = XCB_GC_FOREGROUND | XCB_GC_GRAPHICS_EXPOSURES;
+            let value_list: [u32; 2] = [screen.white_pixel, 0];
+            xcb_create_gc(self.connection, foreground, windowp, mask, value_list.as_ptr());
+
+            let rectangles: [XCBRectangleFFI; 2] = [
+                XCBRectangleFFI {
+                    x: 100,
+                    y: 100,
+                    width: 150,
+                    height: 100,
+                },
+                XCBRectangleFFI {
+                    x: 300,
+                    y: 100,
+                    width: 250,
+                    height: 100,
+                }
+            ];
+
             loop {
                 let event = xcb_wait_for_event(self.connection);
                 let event_type = (*event).response_type & !0x80;
 
                 if event_type == 12 { // XCB_EXPOSE
+                    xcb_poly_rectangle(self.connection, windowp, foreground, 2, rectangles.as_ptr());
                     xcb_flush(self.connection);
                 } else if event_type ==  2 { // XCB_KEY_PRESS
                     break;
