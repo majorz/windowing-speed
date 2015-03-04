@@ -231,7 +231,7 @@ impl XCB {
 
             let mask = XCB_CW_BACK_PIXEL | XCB_CW_EVENT_MASK;
             let value_list: [u32; 2] = [
-                screen.black_pixel,
+                screen.white_pixel,
                 XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_KEY_PRESS
             ];
 
@@ -261,7 +261,7 @@ impl XCB {
 
             let foreground = xcb_generate_id(self.connection);
             let mask = XCB_GC_FOREGROUND | XCB_GC_GRAPHICS_EXPOSURES;
-            let value_list: [u32; 2] = [screen.white_pixel, 0];
+            let value_list: [u32; 2] = [screen.black_pixel, 0];
             xcb_create_gc(self.connection, foreground, windowp, mask, value_list.as_ptr());
 
             let rectangles: [XCBRectangleFFI; 2] = [
