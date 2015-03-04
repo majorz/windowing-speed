@@ -10,9 +10,7 @@ fn main() {
 
     xcb.create_window();
 
-    xcb.print_screen_dimensions();
-
-    xcb.pause();
+    xcb.exec();
 
     xcb.disconnect();
 }

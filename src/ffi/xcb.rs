@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 
 use libc::{c_int, c_char, c_uchar, c_ushort, c_uint};
-use libc::funcs::posix88::unistd::pause;
 use std::ptr;
 use std::mem;
 use std::default::Default;
@@ -35,6 +34,49 @@ const XCB_GC_CLIP_MASK: c_uint = 524288;
 const XCB_GC_DASH_OFFSET: c_uint = 1048576;
 const XCB_GC_DASH_LIST: c_uint = 2097152;
 const XCB_GC_ARC_MODE: c_uint = 4194304;
+
+const XCB_CW_BACK_PIXMAP: c_uint = 1;
+const XCB_CW_BACK_PIXEL: c_uint = 2;
+const XCB_CW_BORDER_PIXMAP: c_uint = 4;
+const XCB_CW_BORDER_PIXEL: c_uint = 8;
+const XCB_CW_BIT_GRAVITY: c_uint = 16;
+const XCB_CW_WIN_GRAVITY: c_uint = 32;
+const XCB_CW_BACKING_STORE: c_uint = 64;
+const XCB_CW_BACKING_PLANES: c_uint = 128;
+const XCB_CW_BACKING_PIXEL: c_uint = 256;
+const XCB_CW_OVERRIDE_REDIRECT: c_uint = 512;
+const XCB_CW_SAVE_UNDER: c_uint = 1024;
+const XCB_CW_EVENT_MASK: c_uint = 2048;
+const XCB_CW_DONT_PROPAGATE: c_uint = 4096;
+const XCB_CW_COLORMAP: c_uint = 8192;
+const XCB_CW_CURSOR: c_uint = 16384;
+
+const XCB_EVENT_MASK_NO_EVENT: c_uint = 0;
+const XCB_EVENT_MASK_KEY_PRESS: c_uint = 1;
+const XCB_EVENT_MASK_KEY_RELEASE: c_uint = 2;
+const XCB_EVENT_MASK_BUTTON_PRESS: c_uint = 4;
+const XCB_EVENT_MASK_BUTTON_RELEASE: c_uint = 8;
+const XCB_EVENT_MASK_ENTER_WINDOW: c_uint = 16;
+const XCB_EVENT_MASK_LEAVE_WINDOW: c_uint = 32;
+const XCB_EVENT_MASK_POINTER_MOTION: c_uint = 64;
+const XCB_EVENT_MASK_POINTER_MOTION_HINT: c_uint = 128;
+const XCB_EVENT_MASK_BUTTON_1_MOTION: c_uint = 256;
+const XCB_EVENT_MASK_BUTTON_2_MOTION: c_uint = 512;
+const XCB_EVENT_MASK_BUTTON_3_MOTION: c_uint = 1024;
+const XCB_EVENT_MASK_BUTTON_4_MOTION: c_uint = 2048;
+const XCB_EVENT_MASK_BUTTON_5_MOTION: c_uint = 4096;
+const XCB_EVENT_MASK_BUTTON_MOTION: c_uint = 8192;
+const XCB_EVENT_MASK_KEYMAP_STATE: c_uint = 16384;
+const XCB_EVENT_MASK_EXPOSURE: c_uint = 32768;
+const XCB_EVENT_MASK_VISIBILITY_CHANGE: c_uint = 65536;
+const XCB_EVENT_MASK_STRUCTURE_NOTIFY: c_uint = 131072;
+const XCB_EVENT_MASK_RESIZE_REDIRECT: c_uint = 262144;
+const XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY: c_uint = 524288;
+const XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT: c_uint = 1048576;
+const XCB_EVENT_MASK_FOCUS_CHANGE: c_uint = 2097152;
+const XCB_EVENT_MASK_PROPERTY_CHANGE: c_uint = 4194304;
+const XCB_EVENT_MASK_COLOR_MAP_CHANGE: c_uint = 8388608;
+const XCB_EVENT_MASK_OWNER_GRAB_BUTTON: c_uint = 16777216;
 
 
 // TYPES & STRUCTURES
@@ -110,13 +152,28 @@ struct XCBScreenIteratorFFI {
 
 #[repr(C)]
 #[derive(Copy)]
-struct XCBUnnamed32FFI {
+struct XCBVoidCookieFFI {
     sequence: c_uint,
 }
-impl Default for XCBUnnamed32FFI {
-    fn default() -> XCBUnnamed32FFI { unsafe { mem::zeroed() } }
+
+impl Default for XCBVoidCookieFFI {
+    fn default() -> XCBVoidCookieFFI { unsafe { mem::zeroed() } }
 }
-type XCBVoidCookieFFI = XCBUnnamed32FFI;
+
+
+#[repr(C)]
+#[derive(Copy)]
+pub struct XCBGenericEventFFI {
+    pub response_type: c_uchar,
+    pub pad0: c_uchar,
+    pub sequence: c_ushort,
+    pub pad: [c_uint; 7usize],
+    pub full_sequence: c_uint,
+}
+
+impl Default for XCBGenericEventFFI {
+    fn default() -> XCBGenericEventFFI { unsafe { mem::zeroed() } }
+}
 
 
 // FUNCTIONS
@@ -162,6 +219,8 @@ extern {
     fn xcb_map_window(c: *mut XCBConnectionFFI, window: XCBWindowFFI) -> XCBVoidCookieFFI;
 
     fn xcb_flush(c: *mut XCBConnectionFFI) -> c_int;
+
+    fn xcb_wait_for_event(c: *mut XCBConnectionFFI) -> *mut XCBGenericEventFFI;
 }
 
 
@@ -211,28 +270,43 @@ impl XCB {
 
             let screen = *self.screen.unwrap();
 
+            let mask = XCB_CW_BACK_PIXEL | XCB_CW_EVENT_MASK;
+            let value_list: [u32; 2] = [
+                screen.black_pixel,
+                XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_KEY_PRESS
+            ];
+
             xcb_create_window(
                 self.connection,
                 0, // Depth - copy from parent
                 window,
                 screen.root,
-                200, 200,
-                400, 300,
-                10,
+                0, 0,
+                screen.width_in_pixels, screen.height_in_pixels,
+                0,
                 XCB_WINDOW_CLASS_INPUT_OUTPUT,
                 screen.root_visual,
-                0, ptr::null(),
+                mask, value_list.as_ptr(),
             );
 
             xcb_map_window(self.connection, window);
+
+            xcb_flush(self.connection);
         }
     }
 
-    pub fn pause(&self) {
+    pub fn exec(&self) {
         unsafe {
-            xcb_flush(self.connection);
+            loop {
+                let event = xcb_wait_for_event(self.connection);
+                let event_type = (*event).response_type & !0x80;
 
-            pause();
+                if event_type == 12 { // XCB_EXPOSE
+                    xcb_flush(self.connection);
+                } else if event_type ==  2 { // XCB_KEY_PRESS
+                    break;
+                }
+            }
         }
     }
 
